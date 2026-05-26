@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PlusCircle, Loader2 } from 'lucide-react';
 
 const TaskForm = ({ onTaskCreated }) => {
@@ -8,6 +8,19 @@ const TaskForm = ({ onTaskCreated }) => {
   const [dueDate, setDueDate] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => {
+    const handleGlobalReset = () => {
+      setPickerOpen(false);
+    };
+    window.addEventListener('click', handleGlobalReset);
+    window.addEventListener('focus', handleGlobalReset);
+    return () => {
+      window.removeEventListener('click', handleGlobalReset);
+      window.removeEventListener('focus', handleGlobalReset);
+    };
+  }, []);
 
   const validate = () => {
     if (!title.trim()) {
@@ -132,8 +145,32 @@ const TaskForm = ({ onTaskCreated }) => {
               id="dueDate"
               type="datetime-local"
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full bg-slate-950/80 border border-slate-800 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 rounded-lg px-3 py-2 text-white focus:outline-none transition"
+              onChange={(e) => {
+                setDueDate(e.target.value);
+                setPickerOpen(false);
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const target = e.target;
+                if (pickerOpen) {
+                  target.blur();
+                  setPickerOpen(false);
+                } else {
+                  try {
+                    target.showPicker();
+                    setPickerOpen(true);
+                  } catch (err) {
+                    // Fallback
+                  }
+                }
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              style={{ colorScheme: 'white' }}
+              className="w-full bg-slate-950/80 border border-slate-800 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 rounded-lg px-3 py-2 text-white focus:outline-none transition cursor-pointer"
               required
             />
           </div>
