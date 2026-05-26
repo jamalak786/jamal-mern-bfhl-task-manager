@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/bfhl/tasks';
+// Base URL is the server domain (e.g. http://localhost:5000 or deployed domain)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -10,22 +11,22 @@ const api = axios.create({
 });
 
 export const getTasks = async (params) => {
-  const response = await api.get('/', { params });
+  const response = await api.get('/bfhl/tasks', { params });
   return response.data;
 };
 
 export const createTask = async (taskData) => {
-  const response = await api.post('/', taskData);
+  const response = await api.post('/bfhl/tasks', taskData);
   return response.data;
 };
 
 export const updateTask = async (id, taskData) => {
-  const response = await api.patch(`/${id}`, taskData);
+  const response = await api.patch(`/bfhl/tasks/${id}`, taskData);
   return response.data;
 };
 
 export const deleteTask = async (id) => {
-  const response = await api.delete(`/${id}`);
+  const response = await api.delete(`/bfhl/tasks/${id}`);
   return response.data;
 };
 
