@@ -2,14 +2,25 @@ import React, { useState, useEffect, useCallback } from 'react';
 import TaskForm from './components/TaskForm';
 import Filters from './components/Filters';
 import TaskList from './components/TaskList';
-import { getTasks, createTask, updateTask, deleteTask } from './services/api';
-import { CheckSquare, ListTodo, AlertCircle, Clock } from 'lucide-react';
+import { getTasks, createTask, updateTask, deleteTask, getTaskStats } from './services/api';
+import { CheckSquare, ListTodo, AlertCircle, Clock, Percent, Star } from 'lucide-react';
 
 function App() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
+  // Aggregated Stats State
+  const [stats, setStats] = useState({
+    totalTasks: 0,
+    pendingTasks: 0,
+    completedTasks: 0,
+    averageImportance: 0,
+    overdueTasks: 0,
+    tasksByImportance: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 }
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
+
   // Filters
   const [status, setStatus] = useState('all');
   const [minImportance, setMinImportance] = useState(1);
@@ -35,33 +46,47 @@ function App() {
     }
   }, [status, minImportance]);
 
+  // Fetch stats
+  const fetchStats = useCallback(async () => {
+    setLoadingStats(true);
+    try {
+      const data = await getTaskStats();
+      setStats(data);
+    } catch (err) {
+      console.error('Failed to fetch stats:', err);
+    } finally {
+      setLoadingStats(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchTasks();
-  }, [fetchTasks]);
+    fetchStats();
+  }, [fetchTasks, fetchStats]);
 
   // Create Task
   const handleTaskCreated = async (taskData) => {
     await createTask(taskData);
     fetchTasks(); // Refetch to get updated list and priority scores
+    fetchStats();
   };
 
   // Mark Task as Complete
   const handleMarkComplete = async (id) => {
     await updateTask(id, { status: 'completed' });
     fetchTasks(); // Refetch to recalculate scores (completed score = 0) and sort
+    fetchStats();
   };
 
   // Delete Task
   const handleDelete = async (id) => {
     await deleteTask(id);
     setTasks((prevTasks) => prevTasks.filter((t) => t._id !== id));
+    fetchStats();
   };
 
-  // Calculate local stats for header cards
-  const totalCount = tasks.length;
-  const pendingCount = tasks.filter(t => t.status === 'pending').length;
+  // Calculate local high priority stats for filtered tasks
   const highPriorityCount = tasks.filter(t => t.priorityScore >= 50 && t.status !== 'completed').length;
-  const overdueCount = tasks.filter(t => new Date(t.dueDate) < new Date() && t.status !== 'completed').length;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
@@ -83,42 +108,85 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
         
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 flex items-center gap-3">
-            <div className="p-2 bg-blue-500/10 text-blue-400 rounded-lg">
-              <ListTodo className="w-5 h-5" />
+        {/* Stats Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {/* Main Aggregated Stats Cards */}
+          <div className="md:col-span-2 grid grid-cols-2 gap-4">
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 flex items-center gap-3">
+              <div className="p-2 bg-blue-500/10 text-blue-400 rounded-lg">
+                <ListTodo className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="block text-2xl font-bold text-white">
+                  {loadingStats ? '...' : stats.totalTasks}
+                </span>
+                <span className="text-xs text-slate-400">Total Tasks (DB)</span>
+              </div>
             </div>
-            <div>
-              <span className="block text-2xl font-bold text-white">{totalCount}</span>
-              <span className="text-xs text-slate-400">Filtered Tasks</span>
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 flex items-center gap-3">
+              <div className="p-2 bg-amber-500/10 text-amber-400 rounded-lg">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="block text-2xl font-bold text-white">
+                  {loadingStats ? '...' : stats.pendingTasks}
+                </span>
+                <span className="text-xs text-slate-400">Pending Tasks (DB)</span>
+              </div>
+            </div>
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 flex items-center gap-3">
+              <div className="p-2 bg-rose-500/10 text-rose-400 rounded-lg">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="block text-2xl font-bold text-white">
+                  {loadingStats ? '...' : stats.overdueTasks}
+                </span>
+                <span className="text-xs text-slate-400">Overdue Tasks (DB)</span>
+              </div>
+            </div>
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 flex items-center gap-3">
+              <div className="p-2 bg-violet-500/10 text-violet-400 rounded-lg">
+                <Star className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="block text-2xl font-bold text-white">
+                  {loadingStats ? '...' : `${stats.averageImportance}/5`}
+                </span>
+                <span className="text-xs text-slate-400">Avg. Importance</span>
+              </div>
             </div>
           </div>
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 flex items-center gap-3">
-            <div className="p-2 bg-amber-500/10 text-amber-400 rounded-lg">
-              <Clock className="w-5 h-5" />
-            </div>
+
+          {/* Aggregated Tasks by Importance Card */}
+          <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
             <div>
-              <span className="block text-2xl font-bold text-white">{pendingCount}</span>
-              <span className="text-xs text-slate-400">Pending Tasks</span>
-            </div>
-          </div>
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 flex items-center gap-3">
-            <div className="p-2 bg-rose-500/10 text-rose-400 rounded-lg">
-              <AlertCircle className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="block text-2xl font-bold text-white">{highPriorityCount}</span>
-              <span className="text-xs text-slate-400">High Priority (≥50)</span>
-            </div>
-          </div>
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 flex items-center gap-3">
-            <div className="p-2 bg-yellow-500/10 text-yellow-400 rounded-lg">
-              <AlertCircle className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="block text-2xl font-bold text-white">{overdueCount}</span>
-              <span className="text-xs text-slate-400">Overdue Tasks</span>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Tasks By Importance</h3>
+              <div className="space-y-2">
+                {[5, 4, 3, 2, 1].map((level) => {
+                  const count = stats.tasksByImportance[level.toString()] || 0;
+                  const total = stats.totalTasks || 1;
+                  const percentage = stats.totalTasks > 0 ? (count / total) * 100 : 0;
+                  const colors = {
+                    5: 'bg-rose-500',
+                    4: 'bg-orange-500',
+                    3: 'bg-amber-500',
+                    2: 'bg-yellow-500',
+                    1: 'bg-blue-500'
+                  };
+                  return (
+                    <div key={level} className="flex items-center gap-2 text-xs">
+                      <span className="w-12 text-slate-400 font-medium">Lvl {level} ({count})</span>
+                      <div className="flex-1 h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                        <div 
+                          className={`h-full ${colors[level] || 'bg-violet-500'} rounded-full transition-all duration-500`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

@@ -7,6 +7,9 @@ router.route('/')
   .post(taskController.createTask)
   .get(taskController.getTasks);
 
+router.route('/stats')
+  .get(taskController.getStats);
+
 router.route('/:id')
   .patch(taskController.updateTask)
   .delete(taskController.deleteTask);

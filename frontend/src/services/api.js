@@ -30,4 +30,9 @@ export const deleteTask = async (id) => {
   return response.data;
 };
 
+export const getTaskStats = async () => {
+  const response = await api.get('/bfhl/tasks/stats');
+  return response.data;
+};
+
 export default api;

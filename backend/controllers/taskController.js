@@ -180,3 +180,92 @@ exports.deleteTask = async (req, res) => {
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
+// Get aggregate analytics using MongoDB aggregation pipeline
+exports.getStats = async (req, res) => {
+  try {
+    const statsResult = await Task.aggregate([
+      {
+        $facet: {
+          overall: [
+            {
+              $group: {
+                _id: null,
+                totalTasks: { $sum: 1 },
+                pendingTasks: {
+                  $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
+                },
+                completedTasks: {
+                  $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
+                },
+                averageImportance: { $avg: '$importance' },
+                overdueTasks: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $eq: ['$status', 'pending'] },
+                          { $lt: ['$dueDate', new Date()] }
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                }
+              }
+            }
+          ],
+          tasksByImportance: [
+            {
+              $group: {
+                _id: '$importance',
+                count: { $sum: 1 }
+              }
+            }
+          ]
+        }
+      }
+    ]);
+
+    const defaultStats = {
+      totalTasks: 0,
+      pendingTasks: 0,
+      completedTasks: 0,
+      averageImportance: 0,
+      overdueTasks: 0,
+      tasksByImportance: {
+        '1': 0,
+        '2': 0,
+        '3': 0,
+        '4': 0,
+        '5': 0
+      }
+    };
+
+    if (!statsResult || statsResult.length === 0 || statsResult[0].overall.length === 0) {
+      return res.status(200).json(defaultStats);
+    }
+
+    const overall = statsResult[0].overall[0];
+    const importanceList = statsResult[0].tasksByImportance;
+
+    const tasksByImportance = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
+    importanceList.forEach(item => {
+      if (item._id >= 1 && item._id <= 5) {
+        tasksByImportance[item._id.toString()] = item.count;
+      }
+    });
+
+    return res.status(200).json({
+      totalTasks: overall.totalTasks || 0,
+      pendingTasks: overall.pendingTasks || 0,
+      completedTasks: overall.completedTasks || 0,
+      averageImportance: overall.averageImportance ? Number(overall.averageImportance.toFixed(2)) : 0,
+      overdueTasks: overall.overdueTasks || 0,
+      tasksByImportance
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
